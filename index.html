@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#FDF2F0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Photobooth · Congreso de Estética 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="bg-decor" aria-hidden="true">
+  <span class="blob blob-1"></span>
+  <span class="blob blob-2"></span>
+  <span class="blob blob-3"></span>
+</div>
+
+<!-- ══════════ PANTALLA INICIAL ══════════ -->
+<section class="screen is-active" id="screen-start">
+  <div class="start-inner">
+    <p class="eyebrow" id="start-tagline">BEAUTY &amp; STYLE</p>
+    <h1 class="title">Photo<span class="title-amp">booth</span></h1>
+    <div class="rule"><span></span>✦<span></span></div>
+    <p class="event-name" id="start-event">Congreso de Estética 2026</p>
+    <p class="lede">Elegí tu marco, mirá a cámara<br>y llevate el recuerdo del stand.</p>
+
+    <button class="btn btn-primary btn-hero" id="btn-start" type="button">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2c.5 0 .96-.26 1.2-.7l.5-.9c.24-.44.7-.7 1.2-.7h2.8c.5 0 .96.26 1.2.7l.5.9c.24.44.7.7 1.2.7h1.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/><circle cx="12" cy="12.4" r="3.6"/></svg>
+      Sacate una foto
+    </button>
+
+    <p class="foot-note">Se te va a pedir permiso para usar la cámara.</p>
+  </div>
+</section>
+
+<!-- ══════════ PANTALLA CÁMARA ══════════ -->
+<section class="screen" id="screen-camera">
+  <header class="topbar">
+    <button class="icon-btn" id="btn-close-cam" type="button" aria-label="Volver al inicio">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <p class="topbar-title" id="cam-event">Congreso de Estética 2026</p>
+    <button class="icon-btn" id="btn-flip" type="button" aria-label="Cambiar de cámara">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V7.5A2.5 2.5 0 0 1 6.5 5H14"/><path d="m11.5 2.5 2.6 2.5-2.6 2.5"/><path d="M20 15v1.5a2.5 2.5 0 0 1-2.5 2.5H10"/><path d="m12.5 21.5-2.6-2.5 2.6-2.5"/></svg>
+    </button>
+  </header>
+
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <video id="video" playsinline autoplay muted></video>
+      <canvas id="overlay-canvas" class="overlay-canvas"></canvas>
+      <div class="stage-loading" id="stage-loading"><span class="spinner"></span>Encendiendo la cámara…</div>
+      <div class="countdown" id="countdown" aria-hidden="true"></div>
+      <div class="flash" id="flash" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="filters" role="group" aria-label="Marcos disponibles">
+    <div class="filters-track" id="filters"></div>
+  </div>
+
+  <div class="shutter-row">
+    <button class="shutter" id="btn-capture" type="button" aria-label="Capturar foto">
+      <span class="shutter-ring"></span>
+      <span class="shutter-core">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2c.5 0 .96-.26 1.2-.7l.5-.9c.24-.44.7-.7 1.2-.7h2.8c.5 0 .96.26 1.2.7l.5.9c.24.44.7.7 1.2.7h1.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/><circle cx="12" cy="12.4" r="3.6"/></svg>
+      </span>
+    </button>
+    <p class="shutter-hint">Tocá para capturar</p>
+  </div>
+</section>
+
+<!-- ══════════ PANTALLA RESULTADO ══════════ -->
+<section class="screen" id="screen-result">
+  <div class="result-inner">
+    <p class="eyebrow">TU FOTO</p>
+    <div class="polaroid">
+      <img id="result-img" alt="Foto capturada en el photobooth">
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-done" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        Listo
+      </button>
+      <button class="btn btn-ghost" id="btn-retake" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5A8 8 0 1 1 17.6 6"/><path d="M20 4v4.5h-4.5"/></svg>
+        Volver a sacar
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ PANTALLA ERROR ══════════ -->
+<section class="screen" id="screen-error">
+  <div class="error-inner">
+    <div class="error-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2c.5 0 .96-.26 1.2-.7l.5-.9c.24-.44.7-.7 1.2-.7h2.8c.5 0 .96.26 1.2.7l.5.9c.24.44.7.7 1.2.7h1.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/><path d="M3 3l18 18"/></svg>
+    </div>
+    <h2 class="error-title" id="error-title">No pudimos abrir la cámara</h2>
+    <p class="error-text" id="error-text">Necesitamos permiso para usar la cámara del celular.</p>
+    <div class="error-help" id="error-help"></div>
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-retry" type="button">Reintentar</button>
+      <button class="btn btn-ghost" id="btn-error-home" type="button">Volver al inicio</button>
+    </div>
+  </div>
+</section>
+
+<div class="rotate-hint" id="rotate-hint" aria-hidden="true">
+  <div class="rotate-card">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.4"/><path d="M10.5 18.6h3"/></svg>
+    <p>Girá el celular</p>
+    <span>La foto sale mejor en vertical</span>
+  </div>
+</div>
+
+<script src="overlays.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
