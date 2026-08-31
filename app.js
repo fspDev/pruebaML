@@ -22,7 +22,13 @@
     btnErrorHome: $('#btn-error-home'),
     stage: $('#stage'),
     video: $('#video'),
+    previewCanvas: $('#preview-canvas'),
     overlayCanvas: $('#overlay-canvas'),
+    tabs: document.querySelectorAll('.tab'),
+    panels: document.querySelectorAll('.panel'),
+    lips: $('#lips'),
+    hairs: $('#hairs'),
+    beautyStatus: $('#beauty-status'),
     stageLoading: $('#stage-loading'),
     countdown: $('#countdown'),
     flash: $('#flash'),
@@ -39,13 +45,129 @@
     facing: 'user',           // 'user' = frontal (selfie)
     overlay: OVERLAYS.find((o) => o.id === 'flores') || OVERLAYS[0],
     busy: false,
-    lastPhoto: null
+    lastPhoto: null,
+    raf: 0,
+    looping: false
   };
+
+  /* ---------- composicion del frame (preview y captura) ---------- */
+
+  /* Recorte tipo object-fit: cover del video hacia un lienzo W x H. */
+  function cropRect(vw, vh, W, H) {
+    const target = W / H;
+    let sx, sy, sw, sh;
+    if (vw / vh > target) {
+      sh = vh; sw = vh * target; sx = (vw - sw) / 2; sy = 0;
+    } else {
+      sw = vw; sh = vw / target; sx = 0; sy = (vh - sh) / 2;
+    }
+    return { sx, sy, sw, sh, vw, vh };
+  }
+
+  let workCanvas = null;
+  function work(W, H) {
+    if (!workCanvas) workCanvas = document.createElement('canvas');
+    if (workCanvas.width !== W || workCanvas.height !== H) {
+      workCanvas.width = W; workCanvas.height = H;
+    }
+    return workCanvas;
+  }
+
+  /* Dibuja video (+ efectos) en ctx. Los efectos se aplican sobre un lienzo
+     SIN espejar, porque los landmarks vienen en coordenadas del video; el
+     espejado de selfie se hace recien al volcar al destino. */
+  function composeFrame(ctx, W, H) {
+    const v = el.video;
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh) return false;
+
+    const crop = cropRect(vw, vh, W, H);
+    const buf = work(W, H);
+    const bctx = buf.getContext('2d');
+    bctx.globalCompositeOperation = 'source-over';
+    bctx.globalAlpha = 1;
+    bctx.drawImage(v, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, W, H);
+
+    if (BEAUTY.active) BEAUTY.paint(bctx, W, H, crop);
+
+    ctx.save();
+    if (isMirrored()) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(buf, 0, 0);
+    ctx.restore();
+    return true;
+  }
+
+  /* ---------- loop de preview (solo con efectos activos) ---------- */
+
+  function renderLoop() {
+    if (!state.looping) return;
+    state.raf = requestAnimationFrame(renderLoop);
+    if (!state.stream || document.hidden) return;
+
+    const rect = el.stage.getBoundingClientRect();
+    if (!rect.width) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = Math.round(rect.width * dpr), H = Math.round(rect.height * dpr);
+    const c = el.previewCanvas;
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+
+    BEAUTY.detect(el.video, performance.now(), false);
+    composeFrame(c.getContext('2d'), W, H);
+  }
+
+  function syncBeautyMode() {
+    const on = BEAUTY.active;
+    el.stage.classList.toggle('is-canvas', on);
+    if (on && !state.looping) {
+      state.looping = true;
+      state.raf = requestAnimationFrame(renderLoop);
+    } else if (!on && state.looping) {
+      state.looping = false;
+      cancelAnimationFrame(state.raf);
+    }
+  }
+
+  function stopLoop() {
+    state.looping = false;
+    cancelAnimationFrame(state.raf);
+    el.stage.classList.remove('is-canvas');
+  }
 
   /* ---------- navegacion entre pantallas ---------- */
 
   function showScreen(id) {
     el.screens.forEach((s) => s.classList.toggle('is-active', s.id === id));
+  }
+
+  /* ---------- medida del stage ---------- */
+
+  /* El stage tiene que conservar EXACTAMENTE la relacion de aspecto de la foto
+     final: si no, el encuadre del preview no coincide con el de la captura.
+     Con CSS solo no alcanza (max-height aplasta la caja cuando el panel de
+     abajo crece), asi que la calculamos contra el espacio disponible. */
+  function layoutStage() {
+    const wrap = el.stage.parentElement;
+    const cs = getComputedStyle(wrap);
+    // caja de contenido: clientWidth/Height incluyen el padding, hay que restarlo
+    const availW = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const availH = wrap.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    if (availW <= 0 || availH <= 0) return;
+
+    const ratio = PB_CONFIG.outputWidth / PB_CONFIG.outputHeight;
+    let w = availW;
+    let h = w / ratio;
+    if (h > availH) { h = availH; w = h * ratio; }
+
+    // Las medidas del CSS son solo el fallback inicial; a partir de aca mandan
+    // estas. El ancho va por flex-basis porque .stage es item de un contenedor
+    // flex y ahi el eje principal lo define flex-basis, no width.
+    w = Math.floor(w);
+    h = Math.floor(h);
+    el.stage.style.maxWidth = 'none';
+    el.stage.style.maxHeight = 'none';
+    el.stage.style.flex = '0 0 ' + w + 'px';
+    el.stage.style.width = w + 'px';
+    el.stage.style.height = h + 'px';
   }
 
   /* ---------- overlay del preview ---------- */
@@ -120,6 +242,75 @@
     drawPreviewOverlay();
   }
 
+  /* ---------- muestras de color (belleza) ---------- */
+
+  function setBeautyStatus(msg, isError) {
+    el.beautyStatus.textContent = msg || '';
+    el.beautyStatus.classList.toggle('is-error', !!isError);
+  }
+
+  function buildSwatches() {
+    const fill = (track, items, kind, offLabel) => {
+      track.innerHTML = '';
+      const mkBtn = (cls, label, onPick) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'swatch ' + cls;
+        b.setAttribute('aria-label', label);
+        b.addEventListener('click', () => {
+          track.querySelectorAll('.swatch').forEach(s => s.classList.toggle('is-active', s === b));
+          onPick();
+        });
+        return b;
+      };
+
+      const none = mkBtn('swatch-none is-active', offLabel, () => pickBeauty(kind, null));
+      track.appendChild(none);
+
+      items.forEach((item) => {
+        const b = mkBtn('', item.name, () => pickBeauty(kind, item));
+        b.style.background = item.color;
+        track.appendChild(b);
+      });
+    };
+
+    fill(el.lips, BEAUTY.LIPS, 'lip', 'Sin labial');
+    fill(el.hairs, BEAUTY.HAIRS, 'hair', 'Color de pelo natural');
+  }
+
+  async function pickBeauty(kind, item) {
+    BEAUTY.state[kind] = item;
+    syncBeautyMode();
+
+    if (!item) {
+      setBeautyStatus(BEAUTY.pending ? 'Preparando…' : '');
+      return;
+    }
+    if (!BEAUTY.pending) { setBeautyStatus(''); return; }
+
+    setBeautyStatus('Preparando el efecto… (se descarga una sola vez)');
+    try {
+      await BEAUTY.prepare();
+      setBeautyStatus('');
+    } catch (err) {
+      console.warn('[photobooth] no se pudo cargar el modelo', err);
+      setBeautyStatus('No se pudo cargar el efecto. Revisá la conexión.', true);
+    }
+  }
+
+  /* ---------- pestanas ---------- */
+
+  function buildTabs() {
+    el.tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        el.tabs.forEach(t => t.classList.toggle('is-active', t === tab));
+        el.panels.forEach(p => p.classList.toggle('is-active', p.id === tab.dataset.panel));
+        layoutStage();
+        drawPreviewOverlay();
+      });
+    });
+  }
+
   /* ---------- camara ---------- */
 
   function isMirrored() {
@@ -129,6 +320,7 @@
   async function startCamera() {
     showScreen('screen-camera');
     el.stageLoading.classList.remove('is-hidden');
+    layoutStage();
     drawPreviewOverlay();
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -172,6 +364,7 @@
     const reveal = () => {
       el.stageLoading.classList.add('is-hidden');
       drawPreviewOverlay();
+      syncBeautyMode();
     };
     if (el.video.readyState >= 2) reveal();
     else el.video.addEventListener('loadeddata', reveal, { once: true });
@@ -212,6 +405,7 @@
     el.errorTitle.innerHTML = title;
     el.errorText.innerHTML = text;
     el.errorHelp.innerHTML = help;
+    stopLoop();
     stopCamera();
     showScreen('screen-error');
     console.warn('[photobooth] error de cámara:', name, err);
@@ -231,21 +425,13 @@
     canvas.height = H;
     const ctx = canvas.getContext('2d');
 
-    // recorte tipo object-fit: cover, igual que el preview
-    const target = W / H;
-    let sx, sy, sw, sh;
-    if (vw / vh > target) {
-      sh = vh; sw = vh * target; sx = (vw - sw) / 2; sy = 0;
-    } else {
-      sw = vw; sh = vw / target; sx = 0; sy = (vh - sh) / 2;
-    }
+    // Una inferencia fresca sobre el frame actual, sin throttling: la foto
+    // se saca una sola vez, asi que aca si conviene gastar los ~25 ms.
+    if (BEAUTY.active) BEAUTY.detect(el.video, performance.now(), true);
 
-    ctx.save();
-    if (isMirrored()) { ctx.translate(W, 0); ctx.scale(-1, 1); }
-    ctx.drawImage(el.video, sx, sy, sw, sh, 0, 0, W, H);
-    ctx.restore();
+    if (!composeFrame(ctx, W, H)) return null;
 
-    // el overlay se dibuja sin espejar para que el texto se lea bien
+    // el marco se dibuja sin espejar para que el texto se lea bien
     state.overlay.draw(ctx, W, H, false);
 
     return canvas.toDataURL('image/jpeg', 0.92);
@@ -301,6 +487,7 @@
   el.btnStart.addEventListener('click', startCamera);
 
   el.btnCloseCam.addEventListener('click', () => {
+    stopLoop();
     stopCamera();
     showScreen('screen-start');
   });
@@ -316,13 +503,15 @@
   el.btnRetake.addEventListener('click', async () => {
     showScreen('screen-camera');
     if (!state.stream) await startCamera();
-    else drawPreviewOverlay();
+    else { drawPreviewOverlay(); syncBeautyMode(); }
   });
 
   el.btnDone.addEventListener('click', () => {
     console.log('[photobooth] Foto confirmada ✔', {
       evento: PB_CONFIG.eventName,
       marco: state.overlay.id,
+      labios: BEAUTY.state.lip ? BEAUTY.state.lip.id : null,
+      cabello: BEAUTY.state.hair ? BEAUTY.state.hair.id : null,
       camara: state.facing,
       tomadaEl: new Date().toISOString(),
       tamanioAprox: state.lastPhoto
@@ -330,6 +519,7 @@
         : null
     });
     // Siguiente paso (fuera del alcance de esta demo): envío / formulario.
+    stopLoop();
     stopCamera();
     showScreen('screen-start');
   });
@@ -347,13 +537,16 @@
 
   function onResize() {
     checkOrientation();
+    layoutStage();
     drawPreviewOverlay();
   }
 
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', () => setTimeout(onResize, 250));
   if (window.ResizeObserver) {
-    new ResizeObserver(() => drawPreviewOverlay()).observe(el.stage);
+    // observamos el contenedor: al cambiar de pestana cambia su alto disponible
+    new ResizeObserver(() => { layoutStage(); drawPreviewOverlay(); })
+      .observe(el.stage.parentElement);
   }
 
   // la camara se pausa al mandar el celu a background
@@ -370,6 +563,8 @@
   document.title = 'Photobooth · ' + PB_CONFIG.eventName;
 
   buildFilters();
+  buildSwatches();
+  buildTabs();
   checkOrientation();
 
   // redibujar cuando terminen de cargar las tipografias

@@ -54,6 +54,7 @@
   <div class="stage-wrap">
     <div class="stage" id="stage">
       <video id="video" playsinline autoplay muted></video>
+      <canvas id="preview-canvas" class="preview-canvas"></canvas>
       <canvas id="overlay-canvas" class="overlay-canvas"></canvas>
       <div class="stage-loading" id="stage-loading"><span class="spinner"></span>Encendiendo la cámara…</div>
       <div class="countdown" id="countdown" aria-hidden="true"></div>
@@ -61,8 +62,25 @@
     </div>
   </div>
 
-  <div class="filters" role="group" aria-label="Marcos disponibles">
+  <div class="tabs" role="tablist">
+    <button class="tab is-active" type="button" role="tab" data-panel="panel-marcos">Marcos</button>
+    <button class="tab" type="button" role="tab" data-panel="panel-belleza">Belleza</button>
+  </div>
+
+  <div class="panel is-active" id="panel-marcos" role="group" aria-label="Marcos disponibles">
     <div class="filters-track" id="filters"></div>
+  </div>
+
+  <div class="panel" id="panel-belleza">
+    <div class="swatch-row">
+      <span class="swatch-label">Labios</span>
+      <div class="swatch-track" id="lips" role="group" aria-label="Color de labios"></div>
+    </div>
+    <div class="swatch-row">
+      <span class="swatch-label">Cabello</span>
+      <div class="swatch-track" id="hairs" role="group" aria-label="Color de cabello"></div>
+    </div>
+    <p class="beauty-status" id="beauty-status" role="status"></p>
   </div>
 
   <div class="shutter-row">
@@ -121,6 +139,7 @@
 </div>
 
 <script src="overlays.js"></script>
+<script src="beauty.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

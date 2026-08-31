@@ -132,9 +132,11 @@ svg{display:block}
 .stage-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:12px 0}
 .stage{
   position:relative;
+  /* Medida definitiva la fija layoutStage() en JS, atada a la relacion de
+     aspecto de PB_CONFIG. Esto es solo el estado inicial antes de ese calculo. */
   aspect-ratio:3/4;
   width:100%;
-  max-width:min(100%,max(200px,calc((100dvh - 300px) * 0.75)));
+  max-width:100%;
   max-height:100%;
   border-radius:26px;
   overflow:hidden;
@@ -149,6 +151,12 @@ svg{display:block}
 }
 #video.no-mirror{transform:none}
 .overlay-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+/* Se muestra en lugar del <video> cuando hay algun efecto de belleza
+   encendido. Sin efectos dejamos que el video componga solo: gasta
+   menos bateria y no ocupa la CPU. */
+.preview-canvas{position:absolute;inset:0;width:100%;height:100%;display:none}
+.stage.is-canvas .preview-canvas{display:block}
+.stage.is-canvas #video{opacity:0}
 
 .stage-loading{
   position:absolute;inset:0;
@@ -177,6 +185,27 @@ svg{display:block}
 .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
 .flash.is-on{animation:flash .45s ease-out}
 @keyframes flash{0%{opacity:.95}100%{opacity:0}}
+
+/* --- pestanas Marcos / Belleza ------------------------ */
+.tabs{
+  flex:none;display:flex;gap:4px;align-self:center;
+  padding:4px;border-radius:999px;
+  background:rgba(255,255,255,.6);box-shadow:var(--shadow-sm);
+}
+.tab{
+  min-height:38px;padding:0 22px;border-radius:999px;
+  font-size:14px;font-weight:500;letter-spacing:.04em;color:var(--ink-soft);
+  transition:background .18s ease,color .18s ease;
+}
+.tab.is-active{
+  color:#fff;
+  background:linear-gradient(135deg,#E79FB6,#D98BA4 60%,#C9A227 210%);
+  box-shadow:var(--shadow-sm);
+}
+.tab:active{transform:scale(.96)}
+
+.panel{flex:none;display:none;margin:0 -18px}
+.panel.is-active{display:block}
 
 /* --- selector de marcos ------------------------------- */
 .filters{flex:none;margin:0 -18px}
@@ -208,6 +237,38 @@ svg{display:block}
 }
 .chip.is-active .chip-thumb{box-shadow:0 0 0 2.5px var(--rose-500),var(--shadow-md)}
 .chip.is-active .chip-name{color:var(--rose-700);font-weight:500}
+
+/* --- muestras de color (belleza) ---------------------- */
+.swatch-row{display:flex;align-items:center;gap:10px;padding:5px 18px}
+.swatch-label{
+  flex:none;width:56px;
+  font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-soft);
+}
+.swatch-track{
+  display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;padding:3px 0;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.swatch-track::-webkit-scrollbar{display:none}
+.swatch{
+  flex:none;width:44px;height:44px;border-radius:50%;
+  box-shadow:0 0 0 2px transparent,inset 0 -6px 12px rgba(0,0,0,.13),var(--shadow-sm);
+  transition:box-shadow .18s ease,transform .15s ease;
+  position:relative;
+}
+.swatch:active{transform:scale(.9)}
+.swatch.is-active{box-shadow:0 0 0 2.5px var(--rose-500),inset 0 -6px 12px rgba(0,0,0,.13),var(--shadow-md)}
+/* muestra "ninguno": barra diagonal */
+.swatch-none{background:rgba(255,255,255,.85)}
+.swatch-none::after{
+  content:'';position:absolute;left:50%;top:6px;width:2px;height:32px;
+  background:var(--rose-300);transform:translateX(-50%) rotate(45deg);border-radius:2px;
+}
+.beauty-status{
+  min-height:16px;padding:0 18px 2px;
+  font-size:11.5px;font-weight:300;color:var(--ink-soft);text-align:center;
+}
+.beauty-status.is-error{color:var(--rose-700)}
 
 /* --- obturador ---------------------------------------- */
 .shutter-row{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding-top:4px}
@@ -287,6 +348,11 @@ svg{display:block}
   .shutter-core{width:60px;height:60px}
   .chip-thumb{width:56px;height:66px}
   .chip{width:66px}
+  .tab{min-height:34px;padding:0 18px;font-size:13px}
+  .swatch{width:38px;height:38px}
+  .swatch-row{padding:4px 18px;gap:8px}
+  .swatch-label{width:48px;font-size:10px}
+  .beauty-status{min-height:14px;font-size:10.5px}
 }
 @media (max-height:560px){
   .shutter-hint{display:none}

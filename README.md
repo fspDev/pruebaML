@@ -18,7 +18,8 @@ sin dependencias. Pensada para celular (mobile-first, uso tactil).
 | `index.html`  | Las 4 pantallas (inicio / camara / resultado / error).                |
 | `styles.css`  | Diseno rosa-dorado-pastel, mobile-first, safe-area, targets >= 48px.   |
 | `overlays.js` | `PB_CONFIG` + los marcos, dibujados en canvas (sin imagenes externas). |
-| `app.js`      | Camara, seleccion de marco, captura y manejo de errores.              |
+| `beauty.js`   | Labios, rubor y color de pelo con MediaPipe. Paletas editables arriba. |
+| `app.js`      | Camara, seleccion, loop de render, captura y manejo de errores.       |
 | `serve.mjs`   | Servidor estatico minimo para probar en local.                        |
 
 ## Configuracion rapida
@@ -36,6 +37,50 @@ const PB_CONFIG = {
 ```
 
 El nombre del evento se auto-ajusta de tamano para entrar en el marco.
+
+## Filtros de belleza (labios / rubor / pelo)
+
+Pestana "Belleza". Son dos modelos distintos de MediaPipe porque son dos
+problemas distintos:
+
+| Efecto           | Modelo                             | Peso    |
+|------------------|------------------------------------|---------|
+| labios, rubor    | `face_landmarker` (478 puntos)     | 3.6 MB  |
+| color de pelo    | `selfie_multiclass_256x256`        | 15.6 MB |
+| runtime wasm     | `@mediapipe/tasks-vision`          | 11.2 MB |
+
+El pelo no tiene landmarks: necesita segmentacion pixel a pixel. Por eso el
+segmentador se descarga **recien cuando alguien toca un color de pelo**, y el
+que solo quiere labial no paga esos 15.6 MB. Sin ningun efecto elegido no se
+descarga nada y el `<video>` se muestra directo, sin canvas ni CPU de mas.
+
+Como se ve natural: el tinte se aplica con `globalCompositeOperation = 'color'`,
+que toma el tono del color elegido pero **conserva la luminosidad de abajo**.
+Asi sobreviven los brillos y las sombras del pelo y de los labios, en vez de
+quedar una mancha plana.
+
+Para cambiar la paleta, editar `LIPS` y `HAIRS` arriba de `beauty.js`:
+
+```js
+{ id: 'rojo', name: 'Rojo', color: '#C81D3E', blush: '#D9647A', alpha: 0.85 }
+```
+
+`alpha` es la intensidad (0 a 1) y `blush` el tono del rubor que acompana a ese
+labial. Conviene ajustarlos mirando caras reales en un celular, no en el
+escritorio: cambia mucho segun la luz del stand.
+
+Medido en desktop con GPU: ~24 ms el landmarker y ~6 ms el segmentador por
+frame. En un celular de gama media esperar 2-3x eso; si el frame se pone caro,
+`beauty.js` infiere 1 de cada 2 o 3 frames y reusa el resultado anterior (entre
+frames la cara casi no se mueve). Al momento de disparar la foto siempre se
+hace una inferencia fresca, sin throttling.
+
+Limitaciones conocidas:
+- Una sola cara (`numFaces: 1`).
+- El rubor va atado al labial elegido, no es un control separado.
+- Sin internet en la primera carga no hay efectos: los modelos vienen de CDN.
+  Si el wifi del predio es malo, conviene vendorizar los `.task`/`.tflite` en
+  el repo y apuntar `MODEL_FACE` / `MODEL_SEG` a rutas locales.
 
 ## Probar en la compu
 
