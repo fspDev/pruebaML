@@ -39,6 +39,48 @@
   </div>
 </section>
 
+<!-- ══════════ PANTALLA ARMÁ TU LOOK ══════════ -->
+<section class="screen" id="screen-look">
+  <header class="topbar">
+    <button class="icon-btn" id="btn-look-back" type="button" aria-label="Volver al inicio">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <p class="topbar-title">Armá tu look</p>
+    <span class="topbar-spacer" aria-hidden="true"></span>
+  </header>
+
+  <div class="look-stage-wrap">
+    <div class="look-stage">
+      <canvas id="look-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab is-active" type="button" role="tab" data-panel="look-accesorios">Accesorios</button>
+    <button class="tab" type="button" role="tab" data-panel="look-labios">Labios</button>
+    <button class="tab" type="button" role="tab" data-panel="look-extra">Extra</button>
+  </div>
+
+  <div class="panel is-active" id="look-accesorios" role="group" aria-label="Accesorios">
+    <div class="look-track" id="track-accesorio"></div>
+  </div>
+  <div class="panel" id="look-labios" role="group" aria-label="Color de labios">
+    <div class="look-track" id="track-labio"></div>
+  </div>
+  <div class="panel" id="look-extra" role="group" aria-label="Efectos extra">
+    <div class="look-track" id="track-extra"></div>
+  </div>
+
+  <p class="beauty-status" id="look-status" role="status"></p>
+
+  <div class="look-actions">
+    <button class="btn btn-primary" id="btn-look-next" type="button">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2c.5 0 .96-.26 1.2-.7l.5-.9c.24-.44.7-.7 1.2-.7h2.8c.5 0 .96.26 1.2.7l.5.9c.24.44.7.7 1.2.7h1.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z"/><circle cx="12" cy="12.4" r="3.6"/></svg>
+      Siguiente: sacate la foto
+    </button>
+  </div>
+</section>
+
 <!-- ══════════ PANTALLA CÁMARA ══════════ -->
 <section class="screen" id="screen-camera">
   <header class="topbar">
@@ -97,7 +139,11 @@
 <!-- ══════════ PANTALLA RESULTADO ══════════ -->
 <section class="screen" id="screen-result">
   <div class="result-inner">
-    <p class="eyebrow">TU FOTO</p>
+    <div class="archetype">
+      <p class="eyebrow">TU ESTILO ES</p>
+      <p class="archetype-name" id="archetype-name"></p>
+      <p class="archetype-text" id="archetype-text"></p>
+    </div>
     <div class="polaroid">
       <img id="result-img" alt="Foto capturada en el photobooth">
     </div>
@@ -140,6 +186,7 @@
 
 <script src="overlays.js"></script>
 <script src="beauty.js"></script>
+<script src="look.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

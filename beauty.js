@@ -45,6 +45,15 @@ const BEAUTY = (() => {
 
   const state = { lip: null, hair: null };
 
+  /* Otros modulos (look.js) tambien necesitan los landmarks de la cara.
+     En vez de que beauty.js conozca las piezas del look, se registran aca:
+     faceNeed() dice si hace falta el landmarker y los hooks pintan encima
+     del frame una vez que ya estan los labios. */
+  let faceNeed = () => false;
+  const paintHooks = [];
+  function setFaceNeed(fn) { faceNeed = fn; }
+  function addPaintHook(fn) { paintHooks.push(fn); }
+
   let vision = null, fileset = null;
   let landmarker = null, segmenter = null;
   let loadFace = null, loadSeg = null;
@@ -107,7 +116,7 @@ const BEAUTY = (() => {
   /** Baja solo los modelos que hacen falta para el estado actual. */
   function prepare() {
     const jobs = [];
-    if (state.lip) jobs.push(ensureFace());
+    if (state.lip || faceNeed()) jobs.push(ensureFace());
     if (state.hair) jobs.push(ensureSeg());
     return Promise.all(jobs);
   }
@@ -162,7 +171,8 @@ const BEAUTY = (() => {
     frameNo++;
     if (!video.videoWidth) return;
 
-    if (state.lip && landmarker && (force || shouldRun(perf.face))) {
+    const wantFace = state.lip || faceNeed();
+    if (wantFace && landmarker && (force || shouldRun(perf.face))) {
       try {
         const t = performance.now();
         const r = landmarker.detectForVideo(video, tsMs);
@@ -171,7 +181,7 @@ const BEAUTY = (() => {
         last.ptsAt = tsMs;
       } catch (e) { /* un frame perdido no es grave */ }
     }
-    if (!state.lip) last.pts = null;
+    if (!wantFace) last.pts = null;
 
     if (state.hair && segmenter && (force || shouldRun(perf.seg))) {
       try {
@@ -235,10 +245,11 @@ const BEAUTY = (() => {
       ctx.globalAlpha = 1;
     }
 
+    const M = mapper(crop, W, H);
+
     // ----- labios + rubor -----
     if (state.lip && last.pts) {
       const pts = last.pts;
-      const M = mapper(crop, W, H);
       const P = (i) => M(pts[i]);
 
       const layer = tintLayer('lip', frame, W, H, state.lip.color, (c) => {
@@ -273,6 +284,9 @@ const BEAUTY = (() => {
         ctx.restore();
       }
     }
+
+    // ----- piezas del look, encima de todo lo anterior -----
+    for (const fn of paintHooks) fn(ctx, W, H, crop, last.pts, M);
   }
 
   function hexA(hex, a) {
@@ -285,10 +299,13 @@ const BEAUTY = (() => {
   return {
     LIPS, HAIRS, state,
     prepare, detect, paint,
+    setFaceNeed, addPaintHook,
     /** true si hay algun efecto encendido (activa el modo canvas) */
-    get active() { return !!(state.lip || state.hair); },
+    get active() { return !!(state.lip || state.hair || faceNeed()); },
     /** true si falta bajar algun modelo para lo que esta elegido */
-    get pending() { return !!((state.lip && !landmarker) || (state.hair && !segmenter)); },
+    get pending() {
+      return !!(((state.lip || faceNeed()) && !landmarker) || (state.hair && !segmenter));
+    },
     /** para diagnostico */
     get stats() {
       return {

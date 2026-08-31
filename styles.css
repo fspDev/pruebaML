@@ -128,6 +128,56 @@ svg{display:block}
   color:var(--rose-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 
+/* --- pantalla "Arma tu look" -------------------------- */
+/* Ocupa el mismo esqueleto que la camara: topbar, escenario que se estira,
+   pestanas, panel y una accion abajo. */
+.topbar-spacer{width:48px;flex:none}
+
+.look-stage-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:12px 0}
+.look-stage{
+  position:relative;
+  /* igual que .stage: la medida final la fija fitStage() en JS */
+  aspect-ratio:3/4;
+  width:100%;max-width:100%;max-height:100%;
+  border-radius:26px;overflow:hidden;
+  background:#F7E9DC;
+  box-shadow:var(--shadow-lg),0 0 0 1px rgba(255,255,255,.6);
+}
+.look-stage canvas{width:100%;height:100%;display:block}
+
+.look-track{
+  display:flex;gap:12px;padding:4px 18px 10px;
+  overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+}
+.look-track::-webkit-scrollbar{display:none}
+
+/* misma anatomia que .chip de los marcos, pero con la miniatura cuadrada */
+.piece{
+  flex:none;width:78px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  scroll-snap-align:center;
+  transition:transform .15s ease;
+}
+.piece:active{transform:scale(.94)}
+.piece-thumb{
+  width:68px;height:68px;border-radius:18px;overflow:hidden;
+  background:linear-gradient(160deg,#FDEFF2,#F7E9DC);
+  box-shadow:0 0 0 2px transparent,var(--shadow-sm);
+  transition:box-shadow .18s ease;
+}
+.piece-thumb canvas{width:100%;height:100%;display:block}
+.piece-name{
+  font-size:11.5px;font-weight:400;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-soft);white-space:nowrap;
+}
+.piece.is-active .piece-thumb{box-shadow:0 0 0 2.5px var(--rose-500),var(--shadow-md)}
+.piece.is-active .piece-name{color:var(--rose-700);font-weight:500}
+
+.look-actions{flex:none;display:flex;justify-content:center;padding-top:6px}
+.look-actions .btn{max-width:340px}
+
 /* --- stage (video + overlay) -------------------------- */
 .stage-wrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:12px 0}
 .stage{
@@ -299,8 +349,19 @@ svg{display:block}
 }
 .polaroid img{
   display:block;border-radius:4px;
-  max-width:100%;max-height:calc(100dvh - 300px);
+  max-width:100%;max-height:calc(100dvh - 372px);
   width:auto;height:auto;object-fit:contain;background:var(--rose-100);
+}
+
+/* --- arquetipo de estilo (resultado) ------------------ */
+.archetype{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+.archetype-name{
+  font-family:var(--serif);font-size:29px;font-weight:600;font-style:italic;
+  line-height:1.1;color:var(--rose-700);
+}
+.archetype-text{
+  font-size:13px;font-weight:300;line-height:1.45;color:var(--ink-soft);
+  max-width:300px;
 }
 .actions{display:flex;flex-direction:column;gap:11px;width:100%;max-width:340px}
 
@@ -353,6 +414,11 @@ svg{display:block}
   .swatch-row{padding:4px 18px;gap:8px}
   .swatch-label{width:48px;font-size:10px}
   .beauty-status{min-height:14px;font-size:10.5px}
+  .piece{width:68px}
+  .piece-thumb{width:60px;height:60px;border-radius:16px}
+  .archetype-name{font-size:25px}
+  .archetype-text{font-size:12px}
+  .polaroid img{max-height:calc(100dvh - 340px)}
 }
 @media (max-height:560px){
   .shutter-hint{display:none}

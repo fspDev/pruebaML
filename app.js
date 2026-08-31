@@ -13,6 +13,19 @@
     startTagline: $('#start-tagline'),
     camEvent: $('#cam-event'),
     btnStart: $('#btn-start'),
+    btnLookBack: $('#btn-look-back'),
+    btnLookNext: $('#btn-look-next'),
+    lookCanvas: $('#look-canvas'),
+    lookStatus: $('#look-status'),
+    lookTabs: document.querySelectorAll('#screen-look .tab'),
+    lookPanels: document.querySelectorAll('#screen-look .panel'),
+    lookTracks: {
+      accesorio: $('#track-accesorio'),
+      labio: $('#track-labio'),
+      extra: $('#track-extra')
+    },
+    archetypeName: $('#archetype-name'),
+    archetypeText: $('#archetype-text'),
     btnCloseCam: $('#btn-close-cam'),
     btnFlip: $('#btn-flip'),
     btnCapture: $('#btn-capture'),
@@ -24,8 +37,9 @@
     video: $('#video'),
     previewCanvas: $('#preview-canvas'),
     overlayCanvas: $('#overlay-canvas'),
-    tabs: document.querySelectorAll('.tab'),
-    panels: document.querySelectorAll('.panel'),
+    // acotadas a la camara: la pantalla de look tiene sus propias pestanas
+    tabs: document.querySelectorAll('#screen-camera .tab'),
+    panels: document.querySelectorAll('#screen-camera .panel'),
     lips: $('#lips'),
     hairs: $('#hairs'),
     beautyStatus: $('#beauty-status'),
@@ -145,8 +159,8 @@
      final: si no, el encuadre del preview no coincide con el de la captura.
      Con CSS solo no alcanza (max-height aplasta la caja cuando el panel de
      abajo crece), asi que la calculamos contra el espacio disponible. */
-  function layoutStage() {
-    const wrap = el.stage.parentElement;
+  function fitStage(stage) {
+    const wrap = stage.parentElement;
     const cs = getComputedStyle(wrap);
     // caja de contenido: clientWidth/Height incluyen el padding, hay que restarlo
     const availW = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
@@ -159,16 +173,18 @@
     if (h > availH) { h = availH; w = h * ratio; }
 
     // Las medidas del CSS son solo el fallback inicial; a partir de aca mandan
-    // estas. El ancho va por flex-basis porque .stage es item de un contenedor
+    // estas. El ancho va por flex-basis porque el stage es item de un contenedor
     // flex y ahi el eje principal lo define flex-basis, no width.
     w = Math.floor(w);
     h = Math.floor(h);
-    el.stage.style.maxWidth = 'none';
-    el.stage.style.maxHeight = 'none';
-    el.stage.style.flex = '0 0 ' + w + 'px';
-    el.stage.style.width = w + 'px';
-    el.stage.style.height = h + 'px';
+    stage.style.maxWidth = 'none';
+    stage.style.maxHeight = 'none';
+    stage.style.flex = '0 0 ' + w + 'px';
+    stage.style.width = w + 'px';
+    stage.style.height = h + 'px';
   }
+
+  function layoutStage() { fitStage(el.stage); }
 
   /* ---------- overlay del preview ---------- */
 
@@ -182,6 +198,8 @@
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     const ctx = c.getContext('2d');
     ctx.clearRect(0, 0, w, h);
+    // los extras del look van debajo del marco, como en la foto final
+    LOOK.paintOnFrame(ctx, w, h);
     state.overlay.draw(ctx, w, h, false);
   }
 
@@ -281,6 +299,9 @@
   async function pickBeauty(kind, item) {
     BEAUTY.state[kind] = item;
     syncBeautyMode();
+    // el labial es el mismo dato que la pantalla de look: mantenemos las
+    // dos vistas de acuerdo
+    if (kind === 'lip') { syncLookChips(); drawLookThumbs(); }
 
     if (!item) {
       setBeautyStatus(BEAUTY.pending ? 'Preparando…' : '');
@@ -296,6 +317,132 @@
       console.warn('[photobooth] no se pudo cargar el modelo', err);
       setBeautyStatus('No se pudo cargar el efecto. Revisá la conexión.', true);
     }
+  }
+
+  /* ---------- "Arma tu look" ---------- */
+
+  /* Los accesorios que van pegados a la cara necesitan los landmarks, igual
+     que los labios. Se lo decimos a BEAUTY en vez de que BEAUTY conozca las
+     piezas: asi el motor de inferencia sigue siendo uno solo. */
+  BEAUTY.setFaceNeed(() => LOOK.needsFace());
+  BEAUTY.addPaintHook((ctx, W, H, crop, pts, M) => LOOK.paintOnFace(ctx, W, H, crop, pts, M));
+
+  const LOOK_CATS = [
+    { cat: 'accesorio', items: LOOK.ACCESORIOS, none: 'Sin accesorio' },
+    { cat: 'labio', items: LOOK.LABIOS, none: 'Sin labial' },
+    { cat: 'extra', items: LOOK.EXTRAS, none: 'Sin extra' }
+  ];
+
+  function buildLook() {
+    LOOK_CATS.forEach(({ cat, items, none }) => {
+      const track = el.lookTracks[cat];
+      track.innerHTML = '';
+
+      const add = (pieza, label) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'piece';
+        b.dataset.id = pieza ? pieza.id : '';
+        b.setAttribute('aria-label', label);
+
+        const thumb = document.createElement('span');
+        thumb.className = 'piece-thumb';
+        const cv = document.createElement('canvas');
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        cv.width = Math.round(68 * dpr);
+        cv.height = Math.round(68 * dpr);
+        thumb.appendChild(cv);
+
+        const name = document.createElement('span');
+        name.className = 'piece-name';
+        name.textContent = pieza ? pieza.name : 'Ninguno';
+
+        b.appendChild(thumb);
+        b.appendChild(name);
+        b.addEventListener('click', () => pickPiece(cat, pieza));
+        track.appendChild(b);
+      };
+
+      add(null, none);
+      items.forEach((p) => add(p, p.name));
+    });
+
+    syncLookChips();
+    drawLookThumbs();
+  }
+
+  function drawLookThumbs() {
+    LOOK_CATS.forEach(({ cat, items }) => {
+      el.lookTracks[cat].querySelectorAll('.piece').forEach((b) => {
+        const pieza = b.dataset.id ? items.find((p) => p.id === b.dataset.id) : null;
+        const cv = b.querySelector('canvas');
+        LOOK.drawThumb(cv.getContext('2d'), cv.width, cv.height, cat, pieza);
+      });
+    });
+  }
+
+  function syncLookChips() {
+    LOOK_CATS.forEach(({ cat }) => {
+      const activo = LOOK.current(cat);
+      const id = activo ? activo.id : '';
+      el.lookTracks[cat].querySelectorAll('.piece').forEach((b) => {
+        b.classList.toggle('is-active', b.dataset.id === id);
+      });
+    });
+  }
+
+  async function pickPiece(cat, pieza) {
+    LOOK.pick(cat, pieza);
+    syncLookChips();
+    // el labial cambia la boca del maniqui, asi que las miniaturas de
+    // accesorios tambien se redibujan
+    drawLookThumbs();
+    drawLookPreview();
+    syncBeautyMode();
+
+    if (!BEAUTY.pending) { setLookStatus(''); return; }
+    setLookStatus('Preparando los efectos… (se descarga una sola vez)');
+    try {
+      await BEAUTY.prepare();
+      setLookStatus('');
+    } catch (err) {
+      console.warn('[photobooth] no se pudo cargar el modelo', err);
+      setLookStatus('No se pudo cargar el efecto. Revisá la conexión.', true);
+    }
+  }
+
+  function setLookStatus(msg, isError) {
+    el.lookStatus.textContent = msg || '';
+    el.lookStatus.classList.toggle('is-error', !!isError);
+  }
+
+  function drawLookPreview() {
+    // misma cuenta que la camara: el maniqui tiene que tener la relacion de
+    // aspecto de la foto final, si no el look se ve encuadrado distinto
+    fitStage(el.lookCanvas.parentElement);
+    const cv = el.lookCanvas;
+    const rect = cv.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = Math.round(rect.width * dpr);
+    const H = Math.round(rect.height * dpr);
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    LOOK.drawMannequin(cv.getContext('2d'), W, H);
+  }
+
+  function buildLookTabs() {
+    el.lookTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        el.lookTabs.forEach((t) => t.classList.toggle('is-active', t === tab));
+        el.lookPanels.forEach((p) => p.classList.toggle('is-active', p.id === tab.dataset.panel));
+      });
+    });
+  }
+
+  function showLook() {
+    showScreen('screen-look');
+    // el canvas recien ahora tiene medidas reales
+    requestAnimationFrame(drawLookPreview);
   }
 
   /* ---------- pestanas ---------- */
@@ -431,7 +578,9 @@
 
     if (!composeFrame(ctx, W, H)) return null;
 
-    // el marco se dibuja sin espejar para que el texto se lea bien
+    // Los extras (brillos / destellos / bokeh) y el marco se dibujan sin
+    // espejar: no estan pegados a la cara y el texto tiene que leerse bien.
+    LOOK.paintOnFrame(ctx, W, H);
     state.overlay.draw(ctx, W, H, false);
 
     return canvas.toDataURL('image/jpeg', 0.92);
@@ -439,6 +588,14 @@
 
   function wait(ms) {
     return new Promise((r) => setTimeout(r, ms));
+  }
+
+  /* Arquetipo de estilo segun lo que se eligio en "Arma tu look".
+     Las reglas viven en LOOK.ARQUETIPOS (look.js). */
+  function showArchetype() {
+    const a = LOOK.archetype();
+    el.archetypeName.textContent = a.name + ' ' + a.emoji;
+    el.archetypeText.textContent = a.text;
   }
 
   async function runCountdown() {
@@ -472,6 +629,7 @@
       }
       state.lastPhoto = dataUrl;
       el.resultImg.src = dataUrl;
+      showArchetype();
       await wait(160);
       showScreen('screen-result');
     } finally {
@@ -484,12 +642,16 @@
 
   /* ---------- eventos ---------- */
 
-  el.btnStart.addEventListener('click', startCamera);
+  el.btnStart.addEventListener('click', showLook);
 
+  el.btnLookBack.addEventListener('click', () => showScreen('screen-start'));
+  el.btnLookNext.addEventListener('click', startCamera);
+
+  // la X de la camara vuelve al look, que es el paso anterior
   el.btnCloseCam.addEventListener('click', () => {
     stopLoop();
     stopCamera();
-    showScreen('screen-start');
+    showLook();
   });
 
   el.btnFlip.addEventListener('click', () => {
@@ -510,7 +672,7 @@
     console.log('[photobooth] Foto confirmada ✔', {
       evento: PB_CONFIG.eventName,
       marco: state.overlay.id,
-      labios: BEAUTY.state.lip ? BEAUTY.state.lip.id : null,
+      look: LOOK.summary(),
       cabello: BEAUTY.state.hair ? BEAUTY.state.hair.id : null,
       camara: state.facing,
       tomadaEl: new Date().toISOString(),
@@ -539,6 +701,7 @@
     checkOrientation();
     layoutStage();
     drawPreviewOverlay();
+    drawLookPreview();
   }
 
   window.addEventListener('resize', onResize);
@@ -565,6 +728,8 @@
   buildFilters();
   buildSwatches();
   buildTabs();
+  buildLook();
+  buildLookTabs();
   checkOrientation();
 
   // redibujar cuando terminen de cargar las tipografias
